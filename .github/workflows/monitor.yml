@@ -1,0 +1,136 @@
+name: PWCA monitor
+
+on:
+  schedule:
+    # Every 5 minutes (UTC). GitHub's schedule can be delayed by several minutes or more, or skipped.
+    # Scheduled runs only do work when the repository variable MONITOR_ENABLED is 'true' (see README).
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Run mode"
+        type: choice
+        default: self-test
+        options:
+          - self-test     # self-test + pytest (no network, no state changes)
+          - check         # fetch the live site once (no state changes)
+          - notify-test   # send exactly one Telegram test message
+          - monitor       # run the production monitor once (updates the monitor-state branch)
+
+# Read-only by default. Only the monitor job gets contents: write.
+permissions:
+  contents: read
+
+# Never run concurrently (prevents state-file conflicts)
+concurrency:
+  group: pwca-monitor
+  cancel-in-progress: false
+
+env:
+  PYTHON_VERSION: "3.12"
+  STATE_BRANCH: monitor-state
+
+jobs:
+  test:
+    if: github.event_name == 'workflow_dispatch' && inputs.mode != 'monitor'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+      - run: pip install -r requirements-dev.txt
+
+      - name: self-test
+        if: inputs.mode == 'self-test'
+        run: |
+          python -m pytest -q
+          PYTHONPATH=src python -m pwca_monitor self-test
+          PYTHONPATH=src python -m pwca_monitor test
+
+      - name: check (live site, no state changes)
+        if: inputs.mode == 'check'
+        run: PYTHONPATH=src python -m pwca_monitor check --dry-run
+
+      - name: notify-test (one Telegram message)
+        if: inputs.mode == 'notify-test'
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: PYTHONPATH=src python -m pwca_monitor notify-test
+
+  monitor:
+    if: >-
+      (github.event_name == 'schedule' && vars.MONITOR_ENABLED == 'true') ||
+      (github.event_name == 'workflow_dispatch' && inputs.mode == 'monitor')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write   # needed only to push to the monitor-state branch
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 1
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: requirements.txt
+      - run: pip install -r requirements.txt
+
+      - name: Restore state (monitor-state branch)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git ls-remote --exit-code --heads origin "$STATE_BRANCH" >/dev/null; then
+            git fetch --depth=1 origin "$STATE_BRANCH"
+            git worktree add -B "$STATE_BRANCH" _state FETCH_HEAD
+          else
+            echo "No $STATE_BRANCH branch yet; creating it (the first run only records a baseline)"
+            git worktree add --detach _state
+            git -C _state checkout --orphan "$STATE_BRANCH"
+            git -C _state rm -rfq .
+          fi
+
+      - name: Run monitor
+        id: run
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          set +e
+          PYTHONPATH=src python -m pwca_monitor monitor --state _state/state.json --report-dir reports
+          echo "rc=$?" >> "$GITHUB_OUTPUT"
+
+      - name: Save state (commit only state.json)
+        run: |
+          cd _state
+          git add state.json 2>/dev/null || true
+          if git diff --cached --quiet; then
+            echo "State unchanged"
+            exit 0
+          fi
+          git commit -q -m "Update monitor state ($(date -u +%Y-%m-%dT%H:%MZ))"
+          for i in 1 2 3; do
+            git push -q origin "HEAD:$STATE_BRANCH" && exit 0
+            echo "push failed; retrying ($i)"; sleep $((i * 5))
+          done
+          echo "::error::Could not push state (duplicate notifications are possible on the next run)"
+          exit 1
+
+      - name: Upload full diff
+        if: always() && hashFiles('reports/*') != ''
+        uses: actions/upload-artifact@v5
+        with:
+          name: diff-${{ github.run_id }}
+          path: reports/
+          retention-days: 14
+
+      - name: Reflect monitor exit status
+        if: steps.run.outputs.rc != '0'
+        run: |
+          echo "::error::monitor exited with ${{ steps.run.outputs.rc }} (notification or state failure)"
+          exit 1

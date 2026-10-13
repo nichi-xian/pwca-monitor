@@ -1,0 +1,109 @@
+# PWCA監視の設定。URL・キーワードはここで変更（コード変更不要）。
+
+# サイトURLとディレクトリ。各対象のURLは base_url + events_path + slug で組み立てる。
+# サイト移転・ディレクトリ変更時はここだけ直せばよい。
+# （環境変数 PWCA_BASE_URL / PWCA_EVENTS_PATH で上書き可）
+site:
+  base_url: "https://pwca.org"
+  events_path: "/events/"
+
+request:
+  user_agent: "pwca-monitor/0.1 (+personal event-page update monitor; low frequency)"
+  connect_timeout: 10      # 秒
+  read_timeout: 30         # 秒
+  max_retries: 2           # 5xx・通信エラー時のみ（403/429はリトライしない）
+  retry_backoff: 5         # 秒（試行回数を掛ける）
+  min_text_length: 80      # 抽出本文がこれ未満ならエラー扱い
+  delay_between_requests: 1  # 秒。連続リクエストの間隔（サイト負荷への配慮）
+
+# 抽出ルール（pwca.org大会ページの実構造に合わせて調整済み）
+parser:
+  # 抽出の起点。見つからなければ構造変更・エラーページとみなしてエラー
+  content_selector: "[data-page-events-show]"
+  # 比較から除外する要素（取得ごとに変わる・大会と無関係）
+  exclude_selectors:
+    - "[data-buttons]"          # 開催までのカウントダウン（毎日変わる）
+    - "[data-news-latest]"      # サイト共通の最新ニュース
+    - "[data-social-media]"     # SNSフィード（"1 day ago"等）
+    - "[data-our-partners]"     # スポンサーロゴ
+    - "[data-selection-list]"   # 選手リスト（遅延読み込み。静的HTMLはスケルトンのみ）
+  attachment_extensions: [".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".zip"]
+  # リンクURLから除去するクエリ（追跡パラメータ）
+  strip_query_params: ["utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content", "fbclid", "gclid", "mc_cid", "mc_eid"]
+
+# 監視対象。enabled: false で一時停止。events外のページは url: で直接指定。
+targets:
+  - id: panchgani_asian_tour
+    name: "PWCA Asian Tour India Panchgani"
+    slug: "2026-pwca-asian-tour-india-panchgani-2027-season-2026"
+    enabled: true
+  - id: panchgani_world_cup
+    name: "Paragliding World Cup India Panchgani"
+    slug: "2026-paragliding-world-cup-india-panchgani-2027-season-2026"
+    enabled: true
+  # 例: eventsディレクトリ外のページ（公式PDFなど）
+  # - id: panchgani_bulletin
+  #   name: "Panchgani Bulletin"
+  #   url: "https://pwca.org/storage/xxxx/bulletin.pdf"
+  #   enabled: false
+
+# 配下ページの監視。
+# 大会ページからリンクされ、URLに大会のslugを含むページ（= 同じ大会のページ）も監視する。
+# リンク先1段のみ・大会ごとに上限あり。サイト全体の巡回はしない。
+# まだ公開されていないページ（404）はエラーにせず、公開されたら「新規ページ」として通知する。
+subpages:
+  enabled: true
+  max_per_target: 10
+  # 監視しないURL（正規表現）。今回は開催前の宿泊・予約情報が目的なので成績（リザルト）は除外。
+  # リザルトも監視したくなったら該当行を削除する。
+  exclude_url_patterns:
+    - "^https?://scoring\\.pwca\\.org/"   # 成績サイト（ranking0〜2.html 等）
+    - "/results?(/|$)"                     # リザルトページ
+  # 配下ページの抽出ルール（大会ページ用の設定を上書き）
+  parser:
+    content_selector: ["[data-flux-main]", "main", "body"]
+
+# 宿泊・予約関連キーワード（大文字小文字無視）。追加・変更テキストと新規リンク文字列のみ判定。
+keywords:
+  - accommodation
+  - hotel
+  - hotels
+  - room
+  - rooms
+  - booking
+  - reservation
+  - lodging
+  - resort
+  - availability
+  - check-in
+  - check in
+  - payment
+  - fee
+  - fees
+  - price
+  - prices
+  - deadline
+  - first come
+  - first-served
+  - first come first served
+  - register
+  - registration
+  - deposit
+  - shuttle
+  - transfer
+  - 宿泊
+  - ホテル
+  - 部屋
+  - 予約
+  - 受付
+  - 先着
+  - 支払い
+  - 料金
+  - 締切
+  - 送迎
+
+notify:
+  max_message_chars: 3800          # Telegram上限4096文字に余裕を持たせる
+  max_excerpt_lines: 15
+  error_renotify_hours: 6          # 同一エラー継続中の再通知間隔
+  max_retries: 3                   # Telegram送信失敗時のリトライ回数
