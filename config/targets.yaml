@@ -41,6 +41,37 @@ targets:
     name: "Paragliding World Cup India Panchgani"
     slug: "2026-paragliding-world-cup-india-panchgani-2027-season-2026"
     enabled: true
+  # PWCAニュース一覧。ホテル・宿泊の案内がニュース記事として出る可能性があるため監視する。
+  # 一覧ページ自体の変化（記事が増えた等）は通知せず、新しい記事の本文を1回だけ読んで、
+  # 関連する語を含む記事だけ通知する。
+  - id: pwca_news
+    name: "PWCAニュース"
+    url: "https://pwca.org/news"
+    enabled: true
+    notify_page_changes: false
+    parser:
+      content_selector: ["[data-flux-main]", "main", "body"]
+    subpages:
+      max: 9                        # 一覧に表示される記事数
+      fetch_once: true              # 記事は公開後ほぼ変わらないので1回だけ取得（サイト負荷軽減）
+      subpage_scope: "pwca.org/news/"
+      new_page_note: "PWCAニュースに関連する新しい記事が掲載されました。"
+      # 記事本文にどれかを含む場合だけ通知（大文字小文字無視）。他大会のレース報告などは通知しない。
+      notify_only_if_contains:
+        - Panchgani
+        - India
+        - accommodation
+        - hotel
+        - hotels
+        - lodging
+        - booking
+        - reservation
+        - resort
+        - check-in
+        - 宿泊
+        - ホテル
+        - 予約
+
   # 例: eventsディレクトリ外のページ（公式PDFなど）
   # - id: panchgani_bulletin
   #   name: "Panchgani Bulletin"

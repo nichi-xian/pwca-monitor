@@ -70,10 +70,20 @@ def load_config(path: str | Path) -> Config:
             url = build_target_url(base_url, events_path, t["slug"])
         else:
             raise ConfigError(f"targets[{tid}] needs either slug or url")
-        scope = (t.get("subpage_scope") or t.get("slug")
+        scope = (t.get("subpage_scope") or (t.get("subpages") or {}).get("subpage_scope") or t.get("slug")
                  or urlsplit(url).path.rstrip("/").rsplit("/", 1)[-1] or None)
-        targets.append(Target(id=tid, name=t.get("name", tid), url=url,
-                              enabled=bool(t.get("enabled", True)), scope=scope))
+        sub = t.get("subpages") or {}
+        relevance = sub.get("notify_only_if_contains")
+        targets.append(Target(
+            id=tid, name=t.get("name", tid), url=url,
+            enabled=bool(t.get("enabled", True)), scope=scope,
+            parser=t.get("parser"),
+            notify_page_changes=bool(t.get("notify_page_changes", True)),
+            max_subpages=sub.get("max"),
+            subpage_fetch_once=bool(sub.get("fetch_once", False)),
+            relevance_words=[str(w) for w in relevance] if relevance else None,
+            new_page_note=sub.get("new_page_note"),
+        ))
     if not targets:
         raise ConfigError("targets is empty")
 

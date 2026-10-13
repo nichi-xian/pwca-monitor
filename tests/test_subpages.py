@@ -28,7 +28,7 @@ def test_results_included_when_exclusion_removed():
 
 def test_events_are_separate():
     """Each event only picks up pages containing its own slug."""
-    at, wc = CFG.targets
+    at, wc = CFG.targets[:2]
     links = (f'<a href="{at.url}/hotel">AT hotel</a>'
              f'<a href="{wc.url}/hotel">WC hotel</a>')
     html = f"<html><body><div data-page-events-show>{links}</div></body></html>"
@@ -43,3 +43,10 @@ def test_disabled():
     t = CFG.targets[0]
     snap = parse_page(f'<div data-page-events-show><a href="{t.url}/x">x</a></div>', t.url, t.url, "", CFG.parser)
     assert discover_subpages(t, snap, {**CFG.subpages, "enabled": False}, EXTS) == []
+
+
+def test_news_target_config():
+    news = next(t for t in CFG.targets if t.id == "pwca_news")
+    assert news.url == "https://pwca.org/news" and news.scope == "pwca.org/news/"
+    assert news.notify_page_changes is False and news.subpage_fetch_once is True
+    assert "Panchgani" in news.relevance_words

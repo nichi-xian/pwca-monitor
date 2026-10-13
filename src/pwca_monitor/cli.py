@@ -102,7 +102,7 @@ def cmd_check(args) -> int:
             rc = 1
             continue
         try:
-            snap = parse_page(fr.html, t.url, fr.final_url, fr.fetched_at, cfg.parser)
+            snap = parse_page(fr.html, t.url, fr.final_url, fr.fetched_at, {**cfg.parser, **(t.parser or {})})
         except ParseError as e:
             print(f"!! extraction failed: {e}")
             rc = 1
@@ -138,6 +138,9 @@ def _check_subpages(cfg, target, snap, fetcher, min_len: int) -> int:
     print(f"subpages: {len(subs)} (scope='{target.scope}', excluded: {cfg.subpages.get('exclude_url_patterns') or []})")
     sub_parser = {**cfg.parser, **(cfg.subpages.get("parser") or {})}
     rc = 0
+    if target.subpage_fetch_once and subs:
+        subs = subs[:1]
+        print("  (fetch_once target: checking only the first linked page)")
     for s in subs:
         time.sleep(float(cfg.request.get("delay_between_requests", 1)))
         fr = fetcher.fetch(s.url)
@@ -220,7 +223,7 @@ def cmd_monitor(args) -> int:
                 pass
             rc = 1
     print(f"summary: baseline={result.baselines} unchanged={result.unchanged} updates={result.updates} "
-          f"new_pages={result.new_pages} pending_404={result.pending} "
+          f"new_pages={result.new_pages} pending_404={result.pending} silent={result.silent} "
           f"suppressed={result.suppressed} fetch_errors={result.fetch_errors} notify_failures={result.notify_failures}")
     return rc
 

@@ -22,6 +22,13 @@ class Target:
     enabled: bool = True
     scope: str | None = None       # key identifying pages of the same event (usually the slug)
     parent_id: str | None = None   # set for subpages: id of the event page that links to it
+    # Per-target options (see config/targets.yaml)
+    parser: dict | None = None             # overrides the global parser settings
+    notify_page_changes: bool = True       # False: changes to this page itself are recorded silently
+    max_subpages: int | None = None        # overrides subpages.max_per_target
+    subpage_fetch_once: bool = False       # fetch each linked page only once (news articles)
+    relevance_words: list[str] | None = None  # subpages notify only if added text contains one of these
+    new_page_note: str | None = None       # explanation line in "new page" notifications
 
 
 @dataclass

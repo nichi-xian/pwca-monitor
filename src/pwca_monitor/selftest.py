@@ -344,6 +344,63 @@ def t_subpage_unlinked_is_pruned():
     assert f.calls == [URL] and len(state.data["pages"]) == 1
 
 
+NEWS_URL = "https://pwca.example/news"
+NEWS_LIST = ("<html><body><nav>menu</nav><main><h1>News</h1>{items}"
+             "<p>All the latest stories from the Paragliding World Cup tour.</p></main></body></html>")
+NEWS_ITEM = '<article><h2>{title}</h2><a href="https://pwca.example/news/{n}">Continue reading...</a></article>'
+ARTICLE = "<html><body><main><a href='/news'>back to all news</a><h1>{title}</h1><p>{body}</p></main></body></html>"
+
+
+def _news_setup():
+    cfg = selftest_config(keywords=["accommodation", "hotel", "booking"])
+    cfg.targets = [Target("news", "PWCAニュース", NEWS_URL, scope="pwca.example/news/",
+                          parser={"content_selector": ["main"]}, notify_page_changes=False,
+                          max_subpages=9, subpage_fetch_once=True,
+                          relevance_words=["Panchgani", "India", "hotel", "accommodation"],
+                          new_page_note="PWCAニュースに関連する新しい記事が掲載されました。")]
+    f = FakeFetcher()
+    f.main_url = NEWS_URL
+    state, n = State(), RecordingNotifier()
+    f.set_page("https://pwca.example/news/1", ARTICLE.format(title="Race report Brazil", body="Task 1 was won by someone in Baixo Guandu."))
+    f.set_html(NEWS_LIST.format(items=NEWS_ITEM.format(title="Race report Brazil", n=1)))
+    f.response.url = f.response.final_url = NEWS_URL
+    r = _run(cfg, state, f, n)
+    assert not n.sent and "news" in r.baselines, (r, n.sent)
+    return cfg, state, f, n
+
+
+def _news_add(f, items):
+    f.set_html(NEWS_LIST.format(items="".join(NEWS_ITEM.format(title=t, n=i) for i, t in items)))
+    f.response.url = f.response.final_url = NEWS_URL
+
+
+def t_news_relevant_article_notified():
+    cfg, state, f, n = _news_setup()
+    f.set_page("https://pwca.example/news/2", ARTICLE.format(
+        title="Panchgani 2027: accommodation info", body="The official hotel list for Panchgani is now available."))
+    _news_add(f, [(2, "Panchgani 2027: accommodation info"), (1, "Race report Brazil")])
+    r = _run(cfg, state, f, n)
+    assert len(n.sent) == 1 and r.new_pages, (r, [x.text for x in n.sent])
+    t = n.sent[0].text
+    assert "PWCAニュース › Panchgani 2027: accommodation info" in t and n.sent[0].priority == "宿泊関連の可能性"
+    assert "PWCAニュースに関連する新しい記事" in t and "関連語を検出" in t
+
+
+def t_news_irrelevant_article_silent():
+    cfg, state, f, n = _news_setup()
+    f.set_page("https://pwca.example/news/2", ARTICLE.format(title="Task 2 in Brazil", body="A long race decided at the final glide."))
+    _news_add(f, [(2, "Task 2 in Brazil"), (1, "Race report Brazil")])
+    r = _run(cfg, state, f, n)
+    assert not n.sent and "news" in r.silent, (r, [x.text for x in n.sent])
+
+
+def t_news_articles_fetched_once():
+    cfg, state, f, n = _news_setup()
+    f.calls.clear()
+    _run(cfg, state, f, n)
+    assert f.calls == [NEWS_URL], f.calls
+
+
 def t_console_notifier():
     n = ConsoleNotifier()
     with redirect_stdout(io.StringIO()) as buf:
@@ -373,6 +430,9 @@ SCENARIOS: list[tuple[str, Callable[[], None]]] = [
     ("subpages: results / other events / PDFs / anchors not fetched", t_subpage_excludes_results_and_other_events),
     ("subpages: per-event cap", t_subpage_limit),
     ("subpages: unlinked pages stop being monitored", t_subpage_unlinked_is_pruned),
+    ("news: relevant new article → notification (named by article heading)", t_news_relevant_article_notified),
+    ("news: unrelated article / list change → no notification", t_news_irrelevant_article_silent),
+    ("news: known articles are not re-fetched", t_news_articles_fetched_once),
     ("console notifier output", t_console_notifier),
 ]
 

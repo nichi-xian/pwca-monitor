@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime
 from pathlib import Path
 from typing import Callable, Protocol
@@ -35,6 +35,7 @@ class RunResult:
     new_pages: list[str] = field(default_factory=list)    # subpages that newly appeared
     pending: list[str] = field(default_factory=list)      # subpages not published yet (404)
     suppressed: list[str] = field(default_factory=list)   # duplicate diffs
+    silent: list[str] = field(default_factory=list)       # changed but not notified (by settings / not relevant)
     fetch_errors: list[str] = field(default_factory=list)
     notify_failures: list[str] = field(default_factory=list)
     reports: list[tuple[str, str]] = field(default_factory=list)  # (target_id, full diff)
@@ -88,7 +89,8 @@ class _Run:
 
     def run(self) -> RunResult:
         for target in self.config.enabled_targets:
-            snap = self.process(target, self.config.parser, notify_new=False)
+            parser_cfg = {**self.config.parser, **(target.parser or {})}
+            snap = self.process(target, parser_cfg, notify_new=False)
             if snap is not None and self.sub_cfg.get("enabled"):
                 self.process_subpages(target, snap)
         self.state.heartbeat(self.now())
@@ -99,6 +101,8 @@ class _Run:
         # On the first discovery for this event, existing subpages become a baseline (no notification)
         initialized = self.state.subpages_initialized(target.id)
         for sub in subs:
+            if target.subpage_fetch_once and self.state.get_snapshot(sub.id) is not None:
+                continue  # e.g. news articles: read once, not on every run
             self.process(sub, self.sub_parser, notify_new=initialized, allow_404=True)
         self.state.set_subpages(target.id, {s.url: s.id for s in subs})
 
@@ -159,12 +163,31 @@ class _Run:
             res.suppressed.append(target.id)
             return snap
 
+        if not target.notify_page_changes:
+            log.info("[%s] changed (notifications disabled for this page)", target.id)
+            st.set_snapshot(target.id, snap)
+            res.silent.append(target.id)
+            return snap
+        relevance_hits: list[str] = []
+        if target.relevance_words is not None:
+            texts = diff.added_lines + [l.text for l in diff.added_links] + diff.heading_added
+            relevance_hits = KeywordClassifier(target.relevance_words).find(texts)
+            if not relevance_hits:
+                log.info("[%s] changed but not relevant; not notifying", target.id)
+                st.set_snapshot(target.id, snap)
+                res.silent.append(target.id)
+                return snap
+
         priority, hits = self.classifier.classify(diff)
         res.reports.append((target.id, diff.unified_diff))
         log.info("[%s] %s (%s) keywords=%s", target.id,
                  "new page" if is_new_page else "update detected", priority, hits)
+        if target.parent_id and snap.headings:
+            # Name subpages by their own heading (link text is often "Read more")
+            parent_name = target.name.split(" › ")[0]
+            target = replace(target, name=f"{parent_name} › {snap.headings[0]}")
         msg = build_update_message(target, snap, diff, priority, hits, self.config.notify,
-                                   new_page=is_new_page)
+                                   new_page=is_new_page, relevance_hits=relevance_hits)
         if self.send(msg, target.id):
             st.mark_notified(target.id, diff.diff_hash)
             st.set_snapshot(target.id, snap)

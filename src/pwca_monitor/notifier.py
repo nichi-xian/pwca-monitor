@@ -57,14 +57,17 @@ def _link_line(l: Link, attachments: list[Link]) -> str:
 
 def build_update_message(target: Target, snap: PageSnapshot, diff: DiffResult,
                          priority: str, hits: list[str], notify_cfg: dict,
-                         new_page: bool = False) -> Notification:
+                         new_page: bool = False,
+                         relevance_hits: list[str] | None = None) -> Notification:
     max_lines = int(notify_cfg.get("max_excerpt_lines", 15))
     icon = "🏨" if priority != "通常更新" else ("📄" if new_page else "🔔")
     label = f"新規ページ・{priority}" if new_page else priority
     parts = [f"{icon} 【{label}】{target.name}",
              f"検知日時: {to_jst(snap.fetched_at)}"]
     if new_page:
-        parts.append("大会ページからリンクされた新しいページが公開されました。")
+        parts.append(target.new_page_note or "大会ページからリンクされた新しいページが公開されました。")
+    if relevance_hits:
+        parts.append(f"関連語を検出: {', '.join(relevance_hits)}")
     if hits:
         parts.append(f"関連キーワードを検出: {', '.join(hits)}\n"
                      "※予約受付開始とは限りません。内容を確認してください。")

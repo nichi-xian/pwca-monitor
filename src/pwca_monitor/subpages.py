@@ -23,7 +23,7 @@ def discover_subpages(target: Target, snap: PageSnapshot, sub_cfg: dict,
     """Linked pages whose URL contains the event's scope (slug), minus exclusions."""
     if not sub_cfg.get("enabled") or not target.scope:
         return []
-    limit = int(sub_cfg.get("max_per_target", 10))
+    limit = int(target.max_subpages or sub_cfg.get("max_per_target", 10))
     excludes = [re.compile(p) for p in sub_cfg.get("exclude_url_patterns") or []]
     self_url = _strip_fragment(target.url).rstrip("/")
     found: list[Target] = []
@@ -39,7 +39,9 @@ def discover_subpages(target: Target, snap: PageSnapshot, sub_cfg: dict,
         seen.add(url)
         label = link.text or path.rsplit("/", 1)[-1] or url
         found.append(Target(id=subpage_id(target.id, url), name=f"{target.name} › {label}",
-                            url=url, scope=target.scope, parent_id=target.id))
+                            url=url, scope=target.scope, parent_id=target.id,
+                            relevance_words=target.relevance_words,
+                            new_page_note=target.new_page_note))
         if len(found) >= limit:
             break
     return found
