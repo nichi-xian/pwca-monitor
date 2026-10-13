@@ -1,0 +1,82 @@
+{
+  "errors": {},
+  "last_heartbeat_at": "2026-10-13T14:33:25Z",
+  "notified": {},
+  "pages": {
+    "panchgani_asian_tour": {
+      "attachments": [],
+      "content_hash": "sha256:3cef50eb18c6d59719ca28a1ff448ab8e155c3bdf0567b3535847964886dc799",
+      "final_url": "https://pwca.org/events/2026-pwca-asian-tour-india-panchgani-2027-season-2026",
+      "headings": [
+        "PWCA Asian Tour India Panchgani 2027 - Season 2026",
+        "Results"
+      ],
+      "last_success_at": "2026-10-13T14:33:21Z",
+      "links": [
+        {
+          "text": "Register",
+          "url": "https://pwca.org/account/competitions"
+        },
+        {
+          "text": "Pilot Information",
+          "url": "https://pwca.org/events/2026-pwca-asian-tour-india-panchgani-2027-season-2026#pilot-information"
+        },
+        {
+          "text": "Overall",
+          "url": "https://scoring.pwca.org/2026-pwca-asian-tour-india-panchgani-2027-season-2026/ranking0.html"
+        },
+        {
+          "text": "Women",
+          "url": "https://scoring.pwca.org/2026-pwca-asian-tour-india-panchgani-2027-season-2026/ranking1.html"
+        },
+        {
+          "text": "Teams",
+          "url": "https://scoring.pwca.org/2026-pwca-asian-tour-india-panchgani-2027-season-2026/ranking2.html"
+        }
+      ],
+      "normalized_text": "PWCA Asian Tour India Panchgani 2027 - Season 2026\n06.02.2027 - 12.02.2027\nIndia, Panchgani\nRegister\nRegistration deadline: 07.11.2026\nPilot Information\nSelection List\nResults\nComp. Overall\nOverall\nWomen\nTeams\nPilot Information\nHQ Location\nTo be published",
+      "title": "Paragliding World Cup",
+      "url": "https://pwca.org/events/2026-pwca-asian-tour-india-panchgani-2027-season-2026"
+    },
+    "panchgani_world_cup": {
+      "attachments": [],
+      "content_hash": "sha256:c0b9773b168b4179a871bc517d397a338e9b059bd642d5226959f352bffda191",
+      "final_url": "https://pwca.org/events/2026-paragliding-world-cup-india-panchgani-2027-season-2026",
+      "headings": [
+        "Paragliding World Cup India Panchgani 2027 - Season 2026",
+        "Results"
+      ],
+      "last_success_at": "2026-10-13T14:33:24Z",
+      "links": [
+        {
+          "text": "Register",
+          "url": "https://pwca.org/account/competitions"
+        },
+        {
+          "text": "Pilot Information",
+          "url": "https://pwca.org/events/2026-paragliding-world-cup-india-panchgani-2027-season-2026#pilot-information"
+        },
+        {
+          "text": "Overall",
+          "url": "https://scoring.pwca.org/2026-paragliding-world-cup-india-panchgani-2027-season-2026/ranking0.html"
+        },
+        {
+          "text": "Women",
+          "url": "https://scoring.pwca.org/2026-paragliding-world-cup-india-panchgani-2027-season-2026/ranking1.html"
+        },
+        {
+          "text": "Teams",
+          "url": "https://scoring.pwca.org/2026-paragliding-world-cup-india-panchgani-2027-season-2026/ranking2.html"
+        }
+      ],
+      "normalized_text": "Paragliding World Cup India Panchgani 2027 - Season 2026\n14.02.2027 - 21.02.2027\nIndia, Panchgani\nRegister\nRegistration deadline: 15.11.2026\nPilot Information\nSelection List\nResults\nComp. Overall\nOverall\nWomen\nTeams\nPilot Information\nHQ Location\nTo be published",
+      "title": "Paragliding World Cup",
+      "url": "https://pwca.org/events/2026-paragliding-world-cup-india-panchgani-2027-season-2026"
+    }
+  },
+  "schema_version": 1,
+  "subpages": {
+    "panchgani_asian_tour": {},
+    "panchgani_world_cup": {}
+  }
+}
