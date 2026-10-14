@@ -93,6 +93,17 @@ Actions タブ → "PWCA monitor" → "Run workflow" で、mode を選んで順�
 - 確認方法: Actions タブ → "PWCA monitor" で、`schedule` イベントの実行が数分おきに並んでいることを確認します。`monitor-state` ブランチの `state.json` にある `last_heartbeat_at` は1日1回更新されます。
 - 監視が止まっているように見えるときは、手動で `monitor` を実行するか、元ページを直接確認してください。
 
+## 外部からの定期起動（cron-job.org）
+
+GitHubの schedule は、このリポジトリでは実際には3〜4時間に1回程度しか起動しませんでした（2026-10-14確認）。そのため、**cron-job.org から5分ごとに `workflow_dispatch`（mode=monitor）を呼び出す**方式を併用しています。GitHubの schedule はそのまま予備として残しています。同時に起動しても `concurrency` で1つずつ実行されるので、問題ありません。
+
+- **呼び出し先**: `POST https://api.github.com/repos/nichi-xian/pwca-monitor/actions/workflows/monitor.yml/dispatches`
+- **ヘッダー**: `Authorization: Bearer <トークン>`、`Accept: application/vnd.github+json`、`X-GitHub-Api-Version: 2022-11-28`、`Content-Type: application/json`
+- **本文**: `{"ref":"main","inputs":{"mode":"monitor"}}`
+- **トークン**: Fine-grained personal access token `pwca-cron-trigger`。対象はこのリポジトリのみで、権限は Actions: Read and write だけです。**有効期限は2027-03-01**です。大会後も使う場合は、期限前に作り直して cron-job.org のヘッダーを更新してください。
+- **起動に失敗した場合**: cron-job.org から失敗通知メールが届きます。401 はトークンの期限切れか誤り、404 はURLの誤りです。
+- **止めるとき**: cron-job.org でジョブを無効にするか、`MONITOR_ENABLED` を `false` にします（`false` は schedule だけを止めます。外部起動も止めるには cron-job.org 側を無効にしてください）。
+
 ## 状態ファイル
 
 - 保存先: ブランチ `monitor-state` の `state.json`。コードのブランチとは分離しており、このファイル以外はコミットしません。
