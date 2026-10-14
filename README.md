@@ -7,7 +7,7 @@ PWCA Panchgani大会ページを GitHub Actions で定期取得し、内容が�
 ## 構成
 
 ```
-.github/workflows/monitor.yml   GitHub Actions（schedule + 手動実行）
+.github/workflows/monitor.yml   GitHub Actions（schedule + 手動/外部からの実行）
 config/targets.yaml             監視URL・抽出ルール・キーワード・通知設定
 src/pwca_monitor/
   cli.py        コマンド（self-test / test / check / notify-test / monitor）
@@ -24,9 +24,9 @@ src/pwca_monitor/
 tests/          pytest と HTML fixture（実ページのスナップショットを含む）
 ```
 
-監視対象は2大会で、それぞれ「大会ページ」と「その大会の配下ページ」を監視します。状態保存と通知は大会ごと・ページごとに分かれています。
+監視対象は2大会で、それぞれ「大会ページ」と「その大会の配下ページ」を監視します。加えて、PWCAニュース一覧から、Panchgani・宿泊関連の記事を通知します。状態保存と通知は、ページごとに分かれています。
 
-処理の流れ: 取得 → 抽出（`[data-page-events-show]` 内のみ。カウントダウン・ニュース・SNS・スポンサー・選手リストは除外）→ 前回状態と比較 → 分類 → 通知 → 状態保存。
+処理の流れ: 取得 → 抽出（大会ページは `[data-page-events-show]` 内のみ。カウントダウン・ページ下部の共通ニュース欄・SNS・スポンサー・選手リストは除外。ニュースは一覧ページで別途監視）→ 前回状態と比較 → 分類 → 通知 → 状態保存。
 
 ## ローカルのセットアップ
 
@@ -47,62 +47,172 @@ python3 -m venv .venv
 | `test --send-telegram` / `self-test --send-telegram` | 上記テストに加え、Telegramに1件送信 | Telegram | なし |
 | `monitor --state PATH [--dry-run] [--console]` | 本番監視を1回実行。`--dry-run` は状態を保存せずコンソール表示、`--console` は状態を保存しコンソール表示 | あり | あり |
 
-## Telegram の設定
+## 現在の稼働状況（2026-10-14 時点）
 
-1. Telegramで `@BotFather` に `/newbot` を送ってBotを作成し、表示されたトークンを控えます（**会話・コード・Issueに貼らない**）。
-2. 作成したBotとのチャットを開いて、何か1通送ります。
-3. ブラウザで `https://api.telegram.org/bot<トークン>/getUpdates` を開き、`"chat":{"id": ...}` の数値を確認します。これが Chat ID です（このURLにはトークンが含まれるので、共有・スクショしないでください）。
-4. ローカルで試す場合は `.env.example` を `.env` にコピーして値を入れ、次を実行します（`.env` は `.gitignore` 済み）。
+| 項目 | 内容 |
+|---|---|
+| リポジトリ | https://github.com/nichi-xian/pwca-monitor （Public） |
+| 監視対象 | Asian Tour 大会ページ、World Cup 大会ページ、各配下ページ、PWCAニュース（関連記事のみ通知） |
+| 起動 | cron-job.org から5分ごと（主）＋ GitHub schedule（予備） |
+| 通知先 | Telegram Bot `@nichi_pwca_monitor_bot` |
+| 状態の保存先 | ブランチ `monitor-state` の `state.json` |
+| 外部起動用トークンの期限 | 2027-03-01 |
+
+```
+cron-job.org（5分ごと）──workflow_dispatch──▶ GitHub Actions（monitor）──更新があれば──▶ Telegram
+```
+
+## セットアップ手順（実際に行った手順）
+
+作り直すときや、別の大会で同じ仕組みを作るときは、この順番で進めます。**トークン・Chat ID などの値は、チャット・エディタ・ファイル・Issueに貼らないでください。** 保管はメモアプリなどで行い、GitHubにはSecretsとして登録します。
+
+### ステップ1：Telegram Botを作る
+
+1. Telegramで公式アカウント **`@BotFather`** を開き、`/newbot` を送ります。
+2. 表示名（例：`ニチPWCA監視`）を送ります。チャット一覧にはこの名前で表示されます。
+3. ユーザー名を送ります。英数字と `_` だけを使い、最後を `bot` にします（例：`nichi_pwca_monitor_bot`）。
+4. 「Done! Congratulations on your new bot.」と表示され、**Botトークン**（`数字:英数字`）が表示されます。メモアプリに控えます。
+
+- `Sorry, an error has occurred during your request` と出た場合は、BotFather側の一時的なエラーです。`/cancel` を送り、時間をおいて `/newbot` からやり直します。
+
+**トークンを作り直す（漏れた可能性があるとき）**
+1. BotFatherに `/revoke` を送ります。
+2. 「Choose a bot to generate a new token.」と出たら、`@nichi_pwca_monitor_bot` と**文字で**送ります（ボタンが見えない場合もこれでOK）。
+3. 確認が出たら承認します。「Your token was replaced with a new one.」と新しいトークンが表示されます。古いトークンはこの時点で使えなくなります。
+4. 別の方法：`/mybots` → Botを選ぶ → 「API Token」 → 「Revoke current token」。
+5. GitHubの Secret `TELEGRAM_BOT_TOKEN` も新しい値に更新します（ステップ4）。
+
+### ステップ2：Botとのチャットを開始し、Chat IDを調べる
+
+1. Telegramのチャット一覧に戻り、検索欄（🔍）で `nichi_pwca_monitor_bot` を検索して開きます。BotFatherのチャットとは**別**の、Bot本人とのチャットです。一覧には表示名（`ニチPWCA監視`）で出ます。
+2. 「開始（START）」を押し、`hello` などを1通送ります。Botは返信しませんが、それで正常です。この操作をしないと、Botからの通知が届きません。
+3. **Chat ID を調べる**：Telegramのチャット一覧の検索欄で `userinfobot` を検索し、**`@userinfobot`** を開いて「開始」を押します。返信の `Id:` の数字が Chat ID です（Botとの1対1チャットでは、Chat ID は自分のユーザーIDと同じです）。
+   - 別の方法として、ブラウザで `https://api.telegram.org/bot<トークン>/getUpdates` を開き、`"chat":{"id":` の数字を見る方法もあります。ただし今回は `{"ok":true,"result":[]}` と空のままで取れなかったため、`@userinfobot` を使いました。このURLにはトークンが含まれるので、共有やスクリーンショットはしないでください。
+
+### ステップ3：GitHubリポジトリを作ってアップロードする
+
+1. https://github.com で右上の「＋」→「New repository」を押します。名前を `pwca-monitor`、**Public** にし、README などの追加は**すべてなし**で「Create repository」を押します。
+   - Public の理由：Actionsの実行時間が無料・無制限だからです。Privateの無料枠は月2,000分で、5分間隔だと約8,600分/月になり超過します。公開されるのはコードと公開大会ページの内容だけで、Secretsは公開されません。
+2. GitHub CLI をインストールしてログインします。
    ```bash
-   set -a; source .env; set +a
-   PYTHONPATH=src .venv/bin/python -m pwca_monitor notify-test
+   brew install gh
+   gh auth login --hostname github.com --git-protocol https --web
    ```
-   トークンが誤っていると `HTTP 401: Unauthorized`、Chat IDが誤っていると `HTTP 400: Bad Request: chat not found` と表示されます。トークンはログに出力しません。
-
-## GitHub リポジトリの作成と Secrets
-
-1. GitHubで新しいリポジトリを作成し、このディレクトリをpushします。
+   表示された8文字のコードを https://github.com/login/device に入力し、「Authorize github」を押します。続けて次を実行します。
    ```bash
-   git init -b main && git add . && git commit -m "PWCA monitor"
-   git remote add origin git@github.com:<you>/<repo>.git && git push -u origin main
+   gh auth setup-git
    ```
-   `git status` を見て、`.env` や `state/*.json` が含まれていないことを確認してください。
-2. **公開/非公開の選択**
-   - **Public（推奨）**: Actionsの実行時間が無料・無制限です。`monitor-state` ブランチの状態ファイル（公開大会ページの本文とリンク）も公開されますが、個人情報は含みません。
-   - **Private**: 無料枠は月2,000分です。5分間隔だと1回1分換算で約8,600分/月になり、**無料枠を超えます**。Privateにする場合は cron を `*/30 * * * *` 程度に変更してください。
-3. Settings → Secrets and variables → Actions → **Secrets** に `TELEGRAM_BOT_TOKEN` と `TELEGRAM_CHAT_ID` を登録します。値はGitHubの画面に直接入力し、ファイルやコードには書きません。
-4. Settings → Actions → General → Workflow permissions は既定の "Read repository contents" のままで構いません。ワークフローの `monitor` ジョブだけが `contents: write` を宣言して、`GITHUB_TOKEN` で状態ブランチにpushします（Bot用のPATは不要です）。
+3. **`workflow` 権限を追加します**（これがないと `.github/workflows/` をpushできません）。
+   ```bash
+   gh auth refresh -h github.com -s workflow
+   ```
+   同様にコードを入力して承認します。`gh auth status` の Token scopes に `workflow` があればOKです。
+4. **メールアドレスを公開しない設定**にします（Publicリポジトリではコミットのメールアドレスが公開されるため）。このリポジトリだけ、GitHubの非公開用アドレスを使います。
+   ```bash
+   gh api user --jq .id        # 数字のIDを確認
+   git config user.name "nichi-xian"
+   git config user.email "<ID>+nichi-xian@users.noreply.github.com"
+   ```
+   `--global` を付けないので、他のプロジェクトの設定は変わりません。
+5. コミットしてアップロードします。
+   ```bash
+   git init -b main
+   git add .
+   git status --short    # .env や .venv、state/*.json が含まれていないことを確認
+   git commit -m "Add PWCA event page monitor"
+   git remote add origin https://github.com/nichi-xian/pwca-monitor.git
+   git push -u origin main
+   ```
 
-## GitHub Actions の段階的な有効化
+### ステップ4：Secretsを登録する
 
-Actions タブ → "PWCA monitor" → "Run workflow" で、mode を選んで順に実行します。
+1. リポジトリの **Settings** → 左メニュー **Secrets and variables** → **Actions** を開きます。
+2. 「New repository secret」で次の2つを登録します。値はブラウザに直接入力し、前後にスペースや改行を入れないでください。
 
-1. `self-test`: pytest、self-test、fixtureテスト。
-2. `check`: 実サイト取得のみ。2ページとも `HTTP: 200` で、本文が抽出されていることを確認します。
-3. `notify-test`: Telegramに1件届くことを確認します。
-4. `monitor`（1回目）: `monitor-state` ブランチが作られ、ベースラインが保存されます。通知は来ません。
-5. `monitor`（2回目）: `summary: ... unchanged=[...]` になり、通知が来ないことを確認します（状態が実行をまたいで復元されていることの確認）。
-6. **定期実行の有効化**: Settings → Secrets and variables → Actions → **Variables** に `MONITOR_ENABLED` = `true` を追加します。これを設定するまで、schedule のジョブは skip されます。停止するときは値を `false` にするか、Actions画面で "Disable workflow" を選びます。
+| Name | 値 |
+|---|---|
+| `TELEGRAM_BOT_TOKEN` | ステップ1のBotトークン（作り直した場合は**最新**のもの） |
+| `TELEGRAM_CHAT_ID` | ステップ2のChat ID |
 
-`self-test` / `check` / `notify-test` は `contents: read` 権限のジョブで実行され、状態ブランチに書き込みません。
+値を変更するときは、一覧の鉛筆マーク（✏️）から「Update secret」で更新します。
 
-## スケジュール実行の注意と確認方法
+### ステップ5：GitHub上で手動テストする
 
-- cron は5分間隔（`*/5`）を指定していますが、GitHubのscheduleは混雑時に数分〜数十分遅れたり、実行が抜けたりします。即時通知は保証されません。
-- **Publicリポジトリで60日間活動（コミット等）がないと、scheduleは自動で無効化されます。** GitHubから事前にメールが届くので、Actions画面で "Enable workflow" を押して再開してください。状態ブランチへの1日1回のheartbeatコミットがこの活動に数えられるかは保証されていません。
-- 確認方法: Actions タブ → "PWCA monitor" で、`schedule` イベントの実行が数分おきに並んでいることを確認します。`monitor-state` ブランチの `state.json` にある `last_heartbeat_at` は1日1回更新されます。
-- 監視が止まっているように見えるときは、手動で `monitor` を実行するか、元ページを直接確認してください。
+Actions タブ → 「PWCA monitor」 → 「Run workflow」で mode を選んで実行します。コマンドで行う場合は `gh workflow run monitor.yml -f mode=<mode>` を使います。1つずつ ✅ を確認してから次に進みます。
 
-## 外部からの定期起動（cron-job.org）
+| 順番 | mode | 確認すること |
+|---|---|---|
+| 1 | `self-test` | ✅（pytest・自己テスト・fixtureテストがすべて合格） |
+| 2 | `check` | ✅、ログに各ページの `HTTP: 200` と本文の文字数が出る（GitHubのサーバーからPWCAを読めることの確認） |
+| 3 | `notify-test` | ✅、Botのチャットに「PWCA監視 テスト通知」が届く |
+| 4 | `monitor`（1回目） | ✅、通知なし（初回は記録のみ）。`monitor-state` ブランチが作られる |
+| 5 | `monitor`（2回目） | ✅、通知なし。ログが `unchanged=[...]` になる |
 
-GitHubの schedule は、このリポジトリでは実際には3〜4時間に1回程度しか起動しませんでした（2026-10-14確認）。そのため、**cron-job.org から5分ごとに `workflow_dispatch`（mode=monitor）を呼び出す**方式を併用しています。GitHubの schedule はそのまま予備として残しています。同時に起動しても `concurrency` で1つずつ実行されるので、問題ありません。
+- `notify-test` が `HTTP 401: Unauthorized` で失敗したら、Botトークンの誤りです（作り直す前の古いトークンなど）。最新のトークンで `TELEGRAM_BOT_TOKEN` を更新します。
+- `HTTP 400: Bad Request: chat not found` なら Chat ID の誤りか、Botとのチャットを開始していません（ステップ2）。
 
-- **呼び出し先**: `POST https://api.github.com/repos/nichi-xian/pwca-monitor/actions/workflows/monitor.yml/dispatches`
-- **ヘッダー**: `Authorization: Bearer <トークン>`、`Accept: application/vnd.github+json`、`X-GitHub-Api-Version: 2022-11-28`、`Content-Type: application/json`
-- **本文**: `{"ref":"main","inputs":{"mode":"monitor"}}`
-- **トークン**: Fine-grained personal access token `pwca-cron-trigger`。対象はこのリポジトリのみで、権限は Actions: Read and write だけです。**有効期限は2027-03-01**です。大会後も使う場合は、期限前に作り直して cron-job.org のヘッダーを更新してください。
-- **起動に失敗した場合**: cron-job.org から失敗通知メールが届きます。401 はトークンの期限切れか誤り、404 はURLの誤りです。
-- **止めるとき**: cron-job.org でジョブを無効にするか、`MONITOR_ENABLED` を `false` にします（`false` は schedule だけを止めます。外部起動も止めるには cron-job.org 側を無効にしてください）。
+### ステップ6：GitHubの定期実行（schedule）をONにする
+
+Settings → Secrets and variables → Actions → **Variables** タブ → 「New repository variable」で、`MONITOR_ENABLED` = `true` を登録します。
+
+- 今回は、ONにしてから最初の起動まで**約6時間**かかり、その後も**3〜4時間に1回**しか起動しませんでした。そのため、ステップ7の外部起動を主な起動方法にし、schedule は予備として残しています。
+
+### ステップ7：cron-job.org から5分ごとに起動する
+
+**7-1. 起動用のトークンを作る（GitHub）**
+1. https://github.com/settings/personal-access-tokens/new を開きます。
+2. 次のように設定して「Generate token」を押します。
+
+| 項目 | 設定 |
+|---|---|
+| Token name | `pwca-cron-trigger` |
+| Expiration | Custom → **2027-03-01** |
+| Repository access | **Only select repositories** → `nichi-xian/pwca-monitor` |
+| Repository permissions | **Actions: Read and write** だけ（他は変更しない。Metadata: Read-only は自動で付く） |
+
+3. 表示された `github_pat_...` は1回しか表示されないので、メモアプリに控えます。このトークンでは、このリポジトリの実行開始しかできません。
+
+**7-2. cron-job.org のアカウントを作る**
+1. https://console.cron-job.org/signup で登録します（Time zone は Asia/Tokyo）。
+2. 確認メールのリンクを開いて、ログインします。
+
+**7-3. ジョブを作る**
+Cronjobs → 「CREATE CRONJOB」で、次のように入力して保存します。
+
+COMMON タブ：
+
+| 項目 | 設定 |
+|---|---|
+| Title | `PWCA monitor` |
+| URL | `https://api.github.com/repos/nichi-xian/pwca-monitor/actions/workflows/monitor.yml/dispatches` |
+| Enable job | オン |
+| Save responses in job history | オン |
+| Execution schedule | **Every 5 minutes** |
+| Notifications | 失敗時（execution of the cronjob fails）にチェック |
+
+ADVANCED タブ：
+
+| 項目 | 設定 |
+|---|---|
+| Request method | **POST** |
+| Headers | `Authorization`: `Bearer github_pat_...`（`Bearer`＋半角スペース＋7-1のトークン） |
+|  | `Accept`: `application/vnd.github+json` |
+|  | `X-GitHub-Api-Version`: `2022-11-28` |
+|  | `Content-Type`: `application/json` |
+| Request body | `{"ref":"main","inputs":{"mode":"monitor"}}` |
+
+**7-4. 動作確認**
+Actions タブで、`workflow_dispatch` の実行が5分おきに並び、✅ になっていればOKです。今回は 2026-10-14 11:40 / 11:45（JST）に起動と成功を確認しました。
+
+## 運用
+
+- **ふだん**：何もしなくて大丈夫です。変化がなければ通知は来ません。
+- **確認したいとき**：https://github.com/nichi-xian/pwca-monitor/actions で、✅ が5分おきに並んでいれば正常です。`monitor-state` ブランチの `state.json` の `last_heartbeat_at` は1日1回更新されます。
+- **監視を止める**：cron-job.org でジョブの「Enable job」をオフにします。GitHub側の schedule も止めるには、`MONITOR_ENABLED` を `false` にします（これだけでは外部起動は止まりません）。
+- **cron-job.org から失敗メールが届いたら**：401 はトークンの期限切れか誤り（7-1で作り直し、Authorization を更新）、404 はURLの誤りです。
+- **トークンの期限（2027-03-01）**：大会後も使う場合は、期限前に7-1で作り直して cron-job.org のヘッダーを更新します。
+- **Telegramのトークンを作り直したとき**：Secret `TELEGRAM_BOT_TOKEN` を更新し、`notify-test` で確認します。
+- **schedule の60日ルール**：Publicリポジトリで60日間活動がないと、GitHubが schedule を無効化することがあります（事前にメールが届きます）。外部起動は影響を受けませんが、予備を残したい場合は Actions 画面で「Enable workflow」を押します。
 
 ## 状態ファイル
 
@@ -177,3 +287,6 @@ GitHubの schedule は、このリポジトリでは実際には3〜4時間に1�
 - **選手リスト（Selection List）を除外**: 静的HTMLではスケルトン表示で、実データは遅延読み込みです。宿泊情報とも無関係なため除外しました。
 - **schedule の有効化**: ワークフローの編集ではなく、リポジトリ変数 `MONITOR_ENABLED` で切り替える方式にしました。
 - **Python**: Actionsでは3.12に固定しています。ローカルでは3.14で検証しました。
+- **配下ページの監視を追加**: 大会ページからリンクされた、同じ大会のページも監視します（成績・リザルトは除外）。
+- **ニュース一覧の監視を追加**: 宿泊案内がニュース記事として出る可能性があるため、https://pwca.org/news を監視し、Panchgani・India・宿泊関連の語を含む新しい記事だけ通知します。
+- **外部からの定期起動を追加**: GitHubの schedule が3〜4時間に1回程度しか起動しなかったため、cron-job.org から5分ごとに `workflow_dispatch` を呼び出す方式を主な起動方法にしました（GitHub schedule は予備）。
