@@ -1,12 +1,5 @@
 {
-  "errors": {
-    "panchgani_asian_tour": {
-      "first_at": "2026-10-21T05:57:01Z",
-      "kind": "http_500",
-      "last_notified_at": "2026-10-21T05:57:01Z",
-      "message": "HTTP 500"
-    }
-  },
+  "errors": {},
   "last_heartbeat_at": "2026-10-21T00:00:57Z",
   "notified": {},
   "pages": {
