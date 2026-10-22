@@ -1,5 +1,12 @@
 {
-  "errors": {},
+  "errors": {
+    "panchgani_asian_tour": {
+      "first_at": "2026-10-22T22:20:36Z",
+      "kind": "request",
+      "last_notified_at": "2026-10-22T22:20:36Z",
+      "message": "ChunkedEncodingError"
+    }
+  },
   "last_heartbeat_at": "2026-10-22T00:00:55Z",
   "notified": {},
   "pages": {
