@@ -1,9 +1,9 @@
 {
   "errors": {
-    "panchgani_world_cup": {
-      "first_at": "2026-11-03T04:27:56Z",
+    "panchgani_asian_tour": {
+      "first_at": "2026-11-03T04:30:56Z",
       "kind": "http_520",
-      "last_notified_at": "2026-11-03T04:27:56Z",
+      "last_notified_at": "2026-11-03T04:30:56Z",
       "message": "HTTP 520"
     }
   },
