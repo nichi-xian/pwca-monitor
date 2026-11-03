@@ -1,18 +1,5 @@
 {
-  "errors": {
-    "panchgani_asian_tour": {
-      "first_at": "2026-11-03T05:07:13Z",
-      "kind": "timeout",
-      "last_notified_at": "2026-11-03T05:07:13Z",
-      "message": "ReadTimeout"
-    },
-    "panchgani_world_cup": {
-      "first_at": "2026-11-03T05:07:29Z",
-      "kind": "http_520",
-      "last_notified_at": "2026-11-03T05:07:29Z",
-      "message": "HTTP 520"
-    }
-  },
+  "errors": {},
   "last_heartbeat_at": "2026-11-03T00:00:52Z",
   "notified": {},
   "pages": {
