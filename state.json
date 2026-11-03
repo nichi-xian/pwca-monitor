@@ -1,5 +1,24 @@
 {
-  "errors": {},
+  "errors": {
+    "panchgani_asian_tour": {
+      "first_at": "2026-11-03T03:42:16Z",
+      "kind": "timeout",
+      "last_notified_at": "2026-11-03T03:42:16Z",
+      "message": "ReadTimeout"
+    },
+    "panchgani_world_cup": {
+      "first_at": "2026-11-03T03:44:03Z",
+      "kind": "timeout",
+      "last_notified_at": "2026-11-03T03:44:03Z",
+      "message": "ReadTimeout"
+    },
+    "pwca_news": {
+      "first_at": "2026-11-03T03:45:50Z",
+      "kind": "timeout",
+      "last_notified_at": "2026-11-03T03:45:50Z",
+      "message": "ReadTimeout"
+    }
+  },
   "last_heartbeat_at": "2026-11-03T00:00:52Z",
   "notified": {},
   "pages": {
