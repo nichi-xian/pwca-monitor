@@ -1,5 +1,12 @@
 {
-  "errors": {},
+  "errors": {
+    "pwca_news": {
+      "first_at": "2026-11-03T04:12:40Z",
+      "kind": "timeout",
+      "last_notified_at": "2026-11-03T04:12:40Z",
+      "message": "ReadTimeout"
+    }
+  },
   "last_heartbeat_at": "2026-11-03T00:00:52Z",
   "notified": {},
   "pages": {
