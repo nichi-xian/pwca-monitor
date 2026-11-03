@@ -5,6 +5,18 @@
       "kind": "timeout",
       "last_notified_at": "2026-11-03T04:42:27Z",
       "message": "ReadTimeout"
+    },
+    "panchgani_world_cup": {
+      "first_at": "2026-11-03T04:49:03Z",
+      "kind": "timeout",
+      "last_notified_at": "2026-11-03T04:49:03Z",
+      "message": "ReadTimeout"
+    },
+    "pwca_news": {
+      "first_at": "2026-11-03T04:50:49Z",
+      "kind": "timeout",
+      "last_notified_at": "2026-11-03T04:50:49Z",
+      "message": "ReadTimeout"
     }
   },
   "last_heartbeat_at": "2026-11-03T00:00:52Z",
