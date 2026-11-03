@@ -1,10 +1,10 @@
 {
   "errors": {
     "panchgani_asian_tour": {
-      "first_at": "2026-11-03T04:30:56Z",
-      "kind": "http_520",
-      "last_notified_at": "2026-11-03T04:30:56Z",
-      "message": "HTTP 520"
+      "first_at": "2026-11-03T04:42:27Z",
+      "kind": "timeout",
+      "last_notified_at": "2026-11-03T04:42:27Z",
+      "message": "ReadTimeout"
     }
   },
   "last_heartbeat_at": "2026-11-03T00:00:52Z",
