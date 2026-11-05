@@ -44,6 +44,30 @@ def clean_url(href: str, base: str, strip_params: set[str]) -> str | None:
                        urlencode(query), parts.fragment))
 
 
+def _cf_decode(encoded: str) -> str | None:
+    """Decode a Cloudflare email-protection string (hex; first byte is the XOR key)."""
+    try:
+        data = bytes.fromhex(encoded)
+        if len(data) < 2:
+            return None
+        return bytes(b ^ data[0] for b in data[1:]).decode("utf-8")
+    except (ValueError, UnicodeDecodeError):
+        return None
+
+
+def _decode_cf_emails(root) -> None:
+    """Cloudflare obfuscates emails with a random encoding on every request.
+    Replace them with the real address so they do not look like a change on each fetch."""
+    for el in root.select("[data-cfemail]"):
+        email = _cf_decode(el.get("data-cfemail", ""))
+        el.replace_with(NavigableString(email or "[email protected]"))
+    for a in root.find_all("a", href=True):
+        path, _, frag = a["href"].partition("#")
+        if path.rstrip("/").endswith("/cdn-cgi/l/email-protection"):
+            email = _cf_decode(frag)
+            a["href"] = f"mailto:{email}" if email else "mailto:"
+
+
 def parse_page(html: str, url: str, final_url: str, fetched_at: str,
                parser_cfg: dict) -> PageSnapshot:
     soup = BeautifulSoup(html, "html.parser")
@@ -64,6 +88,7 @@ def parse_page(html: str, url: str, final_url: str, fetched_at: str,
         c.extract()
     for tag in root.find_all(ALWAYS_REMOVE):
         tag.decompose()
+    _decode_cf_emails(root)
     for sel in parser_cfg.get("exclude_selectors") or []:
         for tag in root.select(sel):
             tag.decompose()

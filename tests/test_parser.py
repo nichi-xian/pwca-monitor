@@ -68,3 +68,25 @@ def test_url_env_override(monkeypatch):
     monkeypatch.setenv("PWCA_EVENTS_PATH", "/ev/")
     cfg = load_config(ROOT / "config" / "targets.yaml")
     assert cfg.targets[1].url == "https://mirror.example/ev/2026-paragliding-world-cup-india-panchgani-2027-season-2026"
+
+
+def _cf_encode(email: str, key: int) -> str:
+    return bytes([key] + [b ^ key for b in email.encode()]).hex()
+
+
+def _cf_page(email: str, key: int) -> str:
+    enc = _cf_encode(email, key)
+    return (f'<html><body><main id="m"><p>Reservations: <a href="/cdn-cgi/l/email-protection#{enc}">'
+            f'<span class="__cf_email__" data-cfemail="{enc}">[email&#160;protected]</span></a></p>'
+            '<p>' + "filler text " * 10 + '</p></main></body></html>')
+
+
+def test_cloudflare_email_random_encoding_is_stable():
+    cfg = {**CFG.parser, "content_selector": "#m"}
+    a = parse_page(_cf_page("hq@example.com", 0x47), URL, URL, "t", cfg)
+    b = parse_page(_cf_page("hq@example.com", 0xAA), URL, URL, "t", cfg)
+    assert a.content_hash == b.content_hash
+    assert "Reservations: hq@example.com" in a.normalized_text
+    assert not any("email-protection" in l.url for l in a.links)
+    c = parse_page(_cf_page("new@example.com", 0x47), URL, URL, "t", cfg)
+    assert c.content_hash != a.content_hash
